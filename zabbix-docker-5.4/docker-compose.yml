@@ -4,6 +4,7 @@ services:
     image: nginx
     networks:
       - traefik-public
+      - zbx_net_frontend
     volumes:
       - ./nginx:/etc/nginx/conf.d
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
@@ -12,14 +13,14 @@ services:
         - traefik.enable=true
         - traefik.docker.network=traefik-public
         - traefik.constraint-label=traefik-public
-        - traefik.http.routers.manager-http.rule=Host(`monitoramento.smarthis.com.br`)
-        - traefik.http.routers.manager-http.entrypoints=http
-        - traefik.http.routers.manager-http.middlewares=https-redirect
-        - traefik.http.routers.manager-https.rule=Host(`monitoramento.smarthis.com.br`)
-        - traefik.http.routers.manager-https.entrypoints=https
-        - traefik.http.routers.manager-https.tls=true
-        - traefik.http.routers.manager-https.tls.certresolver=le
-        - traefik.http.services.manager.loadbalancer.server.port=80
+        - traefik.http.routers.monitor-http.rule=Host(`monitoramento.local-hub`)
+        - traefik.http.routers.monitor-http.entrypoints=http
+        - traefik.http.routers.monitor-http.middlewares=https-redirect
+        - traefik.http.routers.monitor-https.rule=Host(`monitoramento.local-hub`)
+        - traefik.http.routers.monitor-https.entrypoints=http
+        - traefik.http.routers.monitor-https.tls=false
+        - traefik.http.routers.monitor-https.tls.certresolver=le
+        - traefik.http.services.monitor.loadbalancer.server.port=80
 
   zabbix-server:
    image: zabbix/zabbix-server-pgsql:alpine-5.4-latest
@@ -27,7 +28,7 @@ services:
    #  - "10051:10051"
    volumes:
     - /etc/localtime:/etc/localtime:ro
-    - /etc/timezone:/etc/timezone:ro 
+    - /etc/timezone:/etc/timezone:ro
     - ./zbx_env/usr/lib/zabbix/alertscripts:/usr/lib/zabbix/alertscripts:ro
     - ./zbx_env/usr/lib/zabbix/externalscripts:/usr/lib/zabbix/externalscripts:ro
     - ./zbx_env/var/lib/zabbix/export:/var/lib/zabbix/export:rw
@@ -37,8 +38,8 @@ services:
     - ./zbx_env/var/lib/zabbix/mibs:/var/lib/zabbix/mibs:ro
     - ./zbx_env/var/lib/zabbix/snmptraps:/var/lib/zabbix/snmptraps:ro
  #   - ./.ZBX_DB_CA_FILE:/run/secrets/root-ca.pem:ro
-    - /home/pemkeys/fullchain.pem:/run/secrets/fullchain.pem:ro
-    - /home/pemkeys/privkey.pem:/run/secrets/privkey.pem:ro
+ #   - /home/pemkeys/fullchain.pem:/run/secrets/fullchain.pem:ro
+ #   - /home/pemkeys/privkey.pem:/run/secrets/privkey.pem:ro
    env_file:
     - .env_db_pgsql
     - .env_srv
@@ -69,7 +70,7 @@ services:
     com.zabbix.component: "zabbix-server"
     com.zabbix.dbtype: "pgsql"
     com.zabbix.os: "alpine"
- 
+
   zabbix-web-nginx-pgsql:
    image: zabbix/zabbix-web-nginx-pgsql:alpine-5.4-latest
   #  ports:
@@ -78,7 +79,7 @@ services:
    volumes:
     - /etc/localtime:/etc/localtime:ro
     - /etc/timezone:/etc/timezone:ro
-    - /home/pemkeys/:/etc/ssl/nginx:ro
+  #  - /home/pemkeys/:/etc/ssl/nginx:ro
     - ./zbx_env/usr/share/zabbix/modules/:/usr/share/zabbix/modules/:ro
    env_file:
     - .env_db_pgsql
@@ -106,7 +107,7 @@ services:
     com.zabbix.webserver: "nginx"
     com.zabbix.dbtype: "pgsql"
     com.zabbix.os: "alpine"
- 
+
   zabbix-agent:
    image: zabbix/zabbix-agent:alpine-5.4-latest
   #  ports:
@@ -134,15 +135,15 @@ services:
     com.zabbix.company: "Zabbix LLC"
     com.zabbix.component: "zabbix-agentd"
     com.zabbix.os: "alpine"
- 
- 
+
+
   postgres-server:
    image: postgres:alpine
  #  command: -c ssl=on -c ssl_cert_file=/run/secrets/server-cert.pem -c ssl_key_file=/run/secrets/server-key.pem -c ssl_ca_file=/run/secrets/root-ca.pem
    volumes:
     - ./zbx_env/var/lib/postgresql/data:/var/lib/postgresql/data:rw
-    - /home/pemkeys/fullchain.pem:/run/secrets/fullchain.pem:ro
-    - /home/pemkeys/privkey.pem:/run/secrets/privkey.pem:ro
+  #  - /home/pemkeys/fullchain.pem:/run/secrets/fullchain.pem:ro
+  #  - /home/pemkeys/privkey.pem:/run/secrets/privkey.pem:ro
    env_file:
     - .env_db_pgsql
    secrets:
@@ -155,12 +156,12 @@ services:
       - postgres-server
       - pgsql-server
       - pgsql-database
- 
-  db_data_pgsql:
-   image: busybox
-   volumes:
-    - ./zbx_env/var/lib/postgresql/data:/var/lib/postgresql/data:rw
- 
+
+#  db_data_pgsql:
+#   image: busybox
+#   volumes:
+#    - ./zbx_env/var/lib/postgresql/data:/var/lib/postgresql/data:rw
+
  # elasticsearch:
  #  image: elasticsearch
  #  profiles:
@@ -173,29 +174,20 @@ services:
  #   zbx_net_backend:
  #    aliases:
  #     - elasticsearch
- 
- networks:
-   zbx_net_frontend:
-     driver: bridge
-     driver_opts:
-       com.docker.network.enable_ipv6: "false"
-     ipam:
-       driver: default
-       config:
-       - subnet: 172.16.238.0/24
-   zbx_net_backend:
-     driver: bridge
-     driver_opts:
-       com.docker.network.enable_ipv6: "false"
-     internal: true
-     ipam:
-       driver: default
-       config:
-       - subnet: 172.16.239.0/24
- 
- 
- secrets:
-   POSTGRES_USER:
-     file: ./.POSTGRES_USER
-   POSTGRES_PASSWORD:
-     file: ./.POSTGRES_PASSWORD
+
+networks:
+  zbx_net_frontend:
+    external: false
+    attachable: true
+  zbx_net_backend:
+    external: false
+    attachable: true
+  traefik-public:
+    external: true
+  
+
+secrets:
+  POSTGRES_USER:
+    file: ./.POSTGRES_USER
+  POSTGRES_PASSWORD:
+    file: ./.POSTGRES_PASSWORD
